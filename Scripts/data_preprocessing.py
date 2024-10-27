@@ -18,7 +18,7 @@ except ConnectionError as e:
     exit()
 
 # Load a pre-trained embedding model to be globally accessible
-model_name = 'all-MiniLM-L6-v2'
+model_name = 'all-MiniLM-L6-v2' # 'all-MiniLM-L6-v2' 'text-embedding-ada-002'
 embedding_model = SentenceTransformer(model_name)
 
 
@@ -62,7 +62,7 @@ def create_elasticsearch_index(es_client, index_name):
             "properties": {
                 "id": {"type": "keyword"},
                 "text": {"type": "text"},
-                "embedding": {"type": "dense_vector", "dims": 384}
+                "embedding": {"type": "dense_vector", "dims": 1536}
             }
         }
     }

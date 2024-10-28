@@ -57,12 +57,16 @@ def concatenate_columns(row):
 
 def create_elasticsearch_index(es_client, index_name):
     """Create index in Elasticsearch with settings for text and vector fields."""
+    if es_client.indices.exists(index=index_name):
+        es_client.indices.delete(index=index_name)
+        print(f"Index '{index_name}' deleted.")
+
     index_body = {
         "mappings": {
             "properties": {
                 "id": {"type": "keyword"},
                 "text": {"type": "text"},
-                "embedding": {"type": "dense_vector", "dims": 1536}
+                "embedding": {"type": "dense_vector", "dims": 384}
             }
         }
     }

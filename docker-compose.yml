@@ -31,9 +31,13 @@ services:
     container_name: streamlit_container
     volumes:
       - ./app:/app  # Mounts the local 'app' directory to the container
+      - ./Scripts:/Scripts  # Mounts the local 'app' directory to the container
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     working_dir: /app
     ports:
       - "8501:8501"  # Exposes Streamlit on port 8501
+      - "8502:8502"  # Exposes Streamlit on port 8501
     command: streamlit run app.py  # Runs the Streamlit app
 
   grafana:

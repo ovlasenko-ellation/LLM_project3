@@ -1,12 +1,16 @@
+# app.py
+import sys
+import os
 import streamlit as st
 import time
-import os
-import pandas as pd
-from rag import (
-    get_answer,  # Function to get the answer from the LLM
-    # Ensure that get_answer returns a dictionary with keys:
-    # 'answer', 'response_time', 'relevance', 'model_used', 'total_tokens', 'openai_cost'
-)
+# Get the directory containing app.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the parent directory (project root)
+parent_dir = os.path.dirname(current_dir)
+# Add the parent directory to sys.path
+sys.path.append(parent_dir)
+
+from Scripts.rag import get_answer
 from db import (
     generate_conversation_id,
     save_conversation,
@@ -14,9 +18,7 @@ from db import (
     get_recent_conversations
 )
 
-# Initialize session state for feedback and conversation history
-if 'feedback_history' not in st.session_state:
-    st.session_state['feedback_history'] = []
+# Initialize session state for conversation history
 if 'conversation_history' not in st.session_state:
     st.session_state['conversation_history'] = []
 
@@ -32,7 +34,7 @@ if ask_button and user_input:
         start_time = time.time()
         # Generate a unique conversation ID
         conversation_id = generate_conversation_id()
-        # Call the get_answer function from rag.py
+        # Get the answer from the LLM
         answer_data = get_answer(user_input)
         end_time = time.time()
         processing_time = end_time - start_time
@@ -44,19 +46,14 @@ if ask_button and user_input:
     st.subheader("Answer:")
     st.write(answer_data["answer"])
 
-    # Display logs and monitoring information
+    # Display monitoring information
     st.subheader("Monitoring Information")
     st.write(f"Response time: {processing_time:.2f} seconds")
     st.write(f"Relevance: {answer_data.get('relevance', 'N/A')}")
+    st.write(f"Model used: {answer_data.get('model_used', 'N/A')}")
     st.write(f"Total tokens: {answer_data.get('total_tokens', 'N/A')}")
-
-    # Append to conversation history
-    st.session_state.conversation_history.append({
-        'question': user_input,
-        'answer': answer_data["answer"],
-        'relevance': answer_data.get('relevance', 'N/A'),
-        'processing_time': processing_time
-    })
+    if answer_data.get("openai_cost", 0) > 0:
+        st.write(f"OpenAI cost: ${answer_data['openai_cost']:.4f}")
 
     # Feedback Buttons
     st.subheader("Was this answer helpful?")
@@ -70,37 +67,28 @@ if ask_button and user_input:
             save_feedback(conversation_id, "NON_RELEVANT")
             st.success("Thank you for your feedback!")
 
-# Display Feedback Stats
-if st.session_state.feedback_history:
-    st.subheader("Feedback Statistics")
-    total_feedback = len(st.session_state.feedback_history)
-    positive_feedback = st.session_state.feedback_history.count(1)
-    negative_feedback = st.session_state.feedback_history.count(-1)
-    st.write(f"Total feedback received: {total_feedback}")
-    st.write(f"Positive feedback: {positive_feedback}")
-    st.write(f"Negative feedback: {negative_feedback}")
+    # Append to conversation history
+    st.session_state.conversation_history.append({
+        'conversation_id': conversation_id,
+        'question': user_input,
+        'answer': answer_data["answer"],
+        'relevance': answer_data.get('relevance', 'N/A'),
+        'processing_time': processing_time,
+        'feedback': None  # Will be updated upon feedback
+    })
 
 # Display Recent Conversations
-if st.button("Refresh Conversations"):
-    st.session_state.conversation_history = get_recent_conversations()
-
 if st.session_state.conversation_history:
     st.subheader("Recent Conversations")
     relevance_filter = st.selectbox(
-        "Filter by relevance:", ["All", "RELEVANT", "PARTLY_RELEVANT", "NON_RELEVANT"]
+        "Filter by relevance:", ["All", "RELEVANT", "NON_RELEVANT"]
     )
 
-    # Filter conversations based on relevance
-    if relevance_filter != "All":
-        filtered_conversations = [
-            convo for convo in st.session_state.conversation_history
-            if convo['feedback'] == relevance_filter
-        ]
-    else:
-        filtered_conversations = st.session_state.conversation_history
+    # Retrieve conversations from the database
+    recent_conversations = get_recent_conversations(relevance_filter=relevance_filter)
 
     # Display conversations
-    for convo in filtered_conversations:
+    for convo in recent_conversations:
         st.write(f"**Question:** {convo['question']}")
         st.write(f"**Answer:** {convo['answer']}")
         st.write(f"**Feedback:** {convo.get('feedback', 'No feedback')}")

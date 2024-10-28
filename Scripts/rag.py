@@ -76,7 +76,7 @@ def create_context(hits):
     """
     Creates context by concatenating the first 5 descriptions from search results.
     """
-    contexts = [hit['_source'].get('description', 'No description available') for hit in hits]
+    contexts = [hit['_source'].get('text', 'No description available') for hit in hits]
     context = "\n\n".join(contexts)
     return context
 
@@ -98,21 +98,45 @@ def build_prompt(question, context):
     prompt = prompt_template.format(question=question, context=context)
     return prompt
 
-def llm(prompt, model_choice='gpt-3.5-turbo'):
+def llm(prompt, model_choice='gpt-4o-mini'):
     """
     Calls the LLM with the prompt using OpenAI's ChatCompletion API.
     """
+    print(100*'-')
+    print(prompt)
+    print(100 * '-')
     try:
         response = client.chat.completions.create(model=model_choice,
         messages=[{"role": "user", "content": prompt}])
         answer = response.choices[0].message.content
         # Get token usage
-        usage = response['usage']
-        total_tokens = usage['total_tokens']
-        return answer, total_tokens
+        usage = response.usage
+        total_tokens = response.usage.total_tokens
+        # Calculate OpenAI cost
+        openai_cost = calculate_openai_cost(usage, model_choice)
+        return answer, model_choice, total_tokens, openai_cost
     except Exception as e:
         logging.error(f"Error calling OpenAI API: {e}")
         return "I'm sorry, but I couldn't retrieve a response at this time."
+
+
+def calculate_openai_cost(usage, model_choice):
+    """
+    Calculates the cost of the OpenAI API call based on the model used and tokens consumed.
+    """
+    # Pricing as of September 2023 (update with current pricing)
+    if model_choice == 'gpt-4o-mini':
+        # $0.000150 per 1K input tokens (prompt)
+        # $0.000600 per 1K output tokens (completion)
+        prompt_tokens = usage.prompt_tokens
+        completion_tokens = usage.completion_tokens
+        prompt_cost = (prompt_tokens / 1000) * 0.000150
+        completion_cost = (completion_tokens / 1000) * 0.000600
+        total_cost = prompt_cost + completion_cost
+    else:
+        total_cost = 0.0
+    return total_cost
+
 
 def evaluate_relevance(question, answer):
     """
@@ -137,40 +161,95 @@ def evaluate_relevance(question, answer):
     cosine_similarity = np.dot(question_embedding, answer_embedding) / (norm_q * norm_a)
     return cosine_similarity
 
-def get_answer():
+def get_answer(question):
     """
     Gets the reply from the LLM and evaluates relevance.
+    Accepts a user's question and returns a dictionary with the answer and monitoring information.
     """
-    question = get_user_question()
-    question_embedding = generate_question_embedding(question)
     start_time = time.time()
-    end_time = time.time()
-    response_time = end_time - start_time
+    answer_data = {}
+    try:
+        # Generate embedding for the question
+        question_embedding = generate_question_embedding(question)
 
-    if question_embedding is None:
-        print("Error generating embedding for the question. Please try again.")
-        return
+        if question_embedding is None:
+            error_msg = "Error generating embedding for the question. Please try again."
+            print(error_msg)
+            answer_data = {
+                'answer': error_msg,
+                'response_time': time.time() - start_time,
+                'relevance': "N/A",
+                'model_used': "N/A",
+                'total_tokens': 0,
+                'openai_cost': 0.0
+            }
+            return answer_data
 
-    # Display the embedding to the user for verification purposes
-    print(f"Generated Embedding for the Question:\n{question_embedding}\n")
+        # Search in ElasticSearch to get the top k documents
+        hits = search_es(question_embedding)
 
-    hits = search_es(question_embedding)
+        if not hits:
+            error_msg = "No relevant information found in Elasticsearch. Please try again later."
+            print(error_msg)
+            answer_data = {
+                'answer': error_msg,
+                'response_time': time.time() - start_time,
+                'relevance': "N/A",
+                'model_used': "N/A",
+                'total_tokens': 0,
+                'openai_cost': 0.0
+            }
+            return answer_data
 
-    if not hits:
-        print("No relevant information found in Elasticsearch. Please try again later.")
-        return
+        # Create context from the retrieved documents
+        context = create_context(hits)
 
-    context = create_context(hits)
-    prompt = build_prompt(question, context)
-    answer = llm(prompt)
+        # Build the prompt
+        prompt = build_prompt(question, context)
 
-    relevance_score = evaluate_relevance(question, answer)
-    if relevance_score is None:
-        relevance_score = "N/A"
+        # Get the LLM's answer and additional info
+        answer, model_used, total_tokens, openai_cost = llm(prompt)
 
-    print(f"Answer:\n{answer}\n")
-    print(f"Relevance Score: {relevance_score}")
+        # Evaluate the relevance of the answer
+        relevance_score = evaluate_relevance(question, answer)
+        if relevance_score is None:
+            relevance_score = "N/A"
+
+        # Calculate response time
+        response_time = time.time() - start_time
+
+        # Prepare the answer data dictionary
+        answer_data = {
+            'answer': answer,
+            'response_time': response_time,
+            'relevance': relevance_score,
+            'model_used': model_used,
+            'total_tokens': total_tokens,
+            'openai_cost': openai_cost
+        }
+
+        return answer_data
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        answer_data = {
+            'answer': f"An error occurred: {e}",
+            'response_time': time.time() - start_time,
+            'relevance': "N/A",
+            'model_used': "N/A",
+            'total_tokens': 0,
+            'openai_cost': 0.0
+        }
+        return answer_data
 
 
 if __name__ == "__main__":
-    get_answer()
+    question = get_user_question()
+    answer_data = get_answer(question)
+    print(f"Answer: {answer_data['answer']}")
+    print(f"Relevance: {answer_data['relevance']}")
+    print(f"Response Time: {answer_data['response_time']:.2f} seconds")
+    print(f"Model Used: {answer_data['model_used']}")
+    print(f"Total Tokens: {answer_data['total_tokens']}")
+    if answer_data['openai_cost'] > 0:
+        print(f"OpenAI Cost: ${answer_data['openai_cost']:.4f}")

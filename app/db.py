@@ -6,9 +6,9 @@ import os
 # Database connection configuration
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '5432')
-DB_NAME = os.getenv('DB_NAME', 'skincare_chatbot')
-DB_USER = os.getenv('DB_USER', 'your_db_username')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'your_db_password')
+DB_NAME = os.getenv('DB_NAME', 'my_database')
+DB_USER = os.getenv('DB_USER', 'db_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'db_password')
 
 def get_db_connection():
     """
@@ -32,16 +32,19 @@ def create_tables():
     cursor = conn.cursor()
     try:
         create_conversations_query = """
-        CREATE TABLE IF NOT EXISTS conversations(
-        conversation_id TEXT,
-        question TEXT,
-        answer TEXT
+        CREATE TABLE conversations (
+            conversation_id VARCHAR(36) PRIMARY KEY,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
         """
         create_feedback_query = """
-        CREATE TABLE IF NOT EXISTS feedback(
-        conversation_id TEXT,
-        feedback TEXT
+        CREATE TABLE feedback (
+            feedback_id SERIAL PRIMARY KEY,
+            conversation_id VARCHAR(36) REFERENCES conversations(conversation_id),
+            feedback VARCHAR(20) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
         """
         cursor.execute(create_conversations_query)

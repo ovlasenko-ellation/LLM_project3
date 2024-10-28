@@ -5,6 +5,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 from elasticsearch import Elasticsearch
 import numpy as np
 import logging
+import time
 
 # Set up logging for debugging and tracking
 logging.basicConfig(level=logging.INFO)
@@ -105,7 +106,10 @@ def llm(prompt, model_choice='gpt-3.5-turbo'):
         response = client.chat.completions.create(model=model_choice,
         messages=[{"role": "user", "content": prompt}])
         answer = response.choices[0].message.content
-        return answer
+        # Get token usage
+        usage = response['usage']
+        total_tokens = usage['total_tokens']
+        return answer, total_tokens
     except Exception as e:
         logging.error(f"Error calling OpenAI API: {e}")
         return "I'm sorry, but I couldn't retrieve a response at this time."
@@ -139,6 +143,9 @@ def get_answer():
     """
     question = get_user_question()
     question_embedding = generate_question_embedding(question)
+    start_time = time.time()
+    end_time = time.time()
+    response_time = end_time - start_time
 
     if question_embedding is None:
         print("Error generating embedding for the question. Please try again.")
@@ -163,6 +170,7 @@ def get_answer():
 
     print(f"Answer:\n{answer}\n")
     print(f"Relevance Score: {relevance_score}")
+
 
 if __name__ == "__main__":
     get_answer()

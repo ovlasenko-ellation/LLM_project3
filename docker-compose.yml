@@ -27,7 +27,7 @@ services:
       - es_data:/usr/share/elasticsearch/data  # Persistent storage for Elasticsearch data
 
   streamlit:
-    image: aminehy/docker-streamlit-app:latest
+    build: .
     container_name: streamlit_container
     volumes:
       - ./app:/app  # Mounts the local 'app' directory to the container
@@ -37,7 +37,7 @@ services:
     working_dir: /app
     ports:
       - "8501:8501"  # Exposes Streamlit on port 8501
-      - "8502:8502"  # Exposes Streamlit on port 8501
+      - "8502:8502"  # Exposes Streamlit on port 8502
     command: streamlit run app.py  # Runs the Streamlit app
 
   grafana:

@@ -1,94 +1,122 @@
 import pandas as pd
 import numpy as np
+from openai import OpenAI
+from sklearn.metrics.pairwise import cosine_similarity
+from rag import (
+    get_user_question,
+    generate_question_embedding,
+    search_es,
+    create_context,
+    build_prompt,
+    llm
+)  # Import functions directly from rag.py
 import os
-import openai
-from tqdm import tqdm
-from rag import generate_question_embedding, search_es, create_context, build_prompt, llm
+import logging
 
-# Set your OpenAI API key
+# Set up OpenAI API key
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Define the prompt template (ensure it matches the one used in your RAG script)
-prompt_template = """
-You are an assistant for skincare products and skincare routine - AI-Powered Skincare Chatbot. You are a skincare expert chatbot that answers user questions about product ingredients, routines, or skin concerns.
-Answer the user QUESTION based on the CONTEXT from the ElasticSearch database.
-Use only the facts from the CONTEXT when answering the QUESTION.
 
-QUESTION: {question}
-
-CONTEXT:
-{context}
-""".strip()
-
-def load_ground_truth(ground_truth_path):
+def load_ground_truth_data(url, num_rows=500):
     """
-    Loads the ground truth data from the CSV file.
+    Load the ground truth data and get the first num_rows.
     """
-    df = pd.read_csv(ground_truth_path)
+    df = pd.read_csv(url).head(num_rows)
     return df
 
-def hit_rate(relevance_total):
-    cnt = 0
 
+def compute_cosine_similarity(v1, v2):
+    """
+    Compute cosine similarity between two vectors.
+    """
+    v1, v2 = np.array(v1).reshape(1, -1), np.array(v2).reshape(1, -1)
+    return cosine_similarity(v1, v2)[0][0]
+
+
+def hit_rate(relevance_total):
+    """
+    Calculate the Hit Rate given relevance data.
+    """
+    cnt = 0
     for line in relevance_total:
         if True in line:
             cnt += 1
+    return cnt / len(relevance_total) if relevance_total else 0
 
-    return cnt / len(relevance_total)
 
 def mrr(relevance_total):
+    """
+    Calculate Mean Reciprocal Rank (MRR) given relevance data.
+    """
     total_score = 0.0
-
     for line in relevance_total:
-        for rank in range(len(line)):
-            if line[rank]:
+        for rank, is_relevant in enumerate(line):
+            if is_relevant:
                 total_score += 1 / (rank + 1)
-                break  # Only consider the first relevant document per query
+                break  # Stop after finding the first relevant answer
+    return total_score / len(relevance_total) if relevance_total else 0
 
-    return total_score / len(relevance_total)
 
-def evaluate_model(df_ground_truth):
+def evaluate_llm_against_ground_truth(df):
     """
-    Evaluates the model using MRR and Hit Rate metrics.
+    Evaluate the LLM against ground truth data based on a single user question.
     """
-    relevance_total = []  # List of lists of relevance per query
+    # Retrieve the actual user question once
+    question = get_user_question()
 
-    for index, row in tqdm(df_ground_truth.iterrows(), total=df_ground_truth.shape[0], desc="Evaluating"):
-        question = row['question']
+    # Generate question embedding
+    question_embedding = generate_question_embedding(question)
+
+    # Elasticsearch retrieval and context creation based on the single question embedding
+    hits = search_es(question_embedding)
+    context = create_context(hits)
+
+    # Construct the prompt using the retrieved context and the actual user question
+    prompt = build_prompt(question, context)
+    llm_answer = llm(prompt)  # Call LLM to get an answer based on the single question
+
+    # Embedding for LLM answer, which will be compared to each ground truth answer
+    v_llm_embedding = generate_question_embedding(llm_answer)
+
+    v_llm = []
+    v_orig = []
+    relevance_total = []
+    cosine_similarities = []
+
+    for idx, row in df.iterrows():
         ground_truth_answer = row['answer']
 
-        # Generate embedding for the question
-        question_embedding = generate_question_embedding(question)
+        # Generate embedding for the ground truth answer
+        v_orig_embedding = generate_question_embedding(ground_truth_answer)
 
-        # Search in ElasticSearch to get the top k documents
-        hits = search_es(question_embedding, k=5)
+        # Store answers for similarity comparisons
+        v_llm.append(llm_answer)
+        v_orig.append(ground_truth_answer)
 
-        # Collect relevance judgments for the retrieved documents
-        relevance_per_query = []
+        # Calculate cosine similarity between LLM and ground truth answer
+        similarity_score = compute_cosine_similarity(v_llm_embedding, v_orig_embedding)
+        cosine_similarities.append(similarity_score)
 
-        for hit in hits:
-            # Assuming the document content is in 'about' or 'description' field
-            document_text = hit['_source'].get('about', '') + " " + hit['_source'].get('description', '')
-            # Check if the ground truth answer is present in the document
-            if ground_truth_answer.lower() in document_text.lower():
-                relevance_per_query.append(True)
-            else:
-                relevance_per_query.append(False)
-
-        relevance_total.append(relevance_per_query)
+        # Determine relevance (similarity > threshold implies relevance)
+        is_relevant = similarity_score > 0.75  # Define a relevance threshold
+        relevance_total.append([is_relevant])
 
     # Compute MRR and Hit Rate
     mrr_score = mrr(relevance_total)
     hit_rate_score = hit_rate(relevance_total)
 
-    return mrr_score, hit_rate_score
+    print(f"MRR Score: {mrr_score}")
+    print(f"Hit Rate: {hit_rate_score}")
+    return v_llm, v_orig, mrr_score, hit_rate_score, cosine_similarities
+
 
 if __name__ == "__main__":
     # Load ground truth data
-    ground_truth_path = './Data/ground_truth.csv'
-    df_ground_truth = load_ground_truth(ground_truth_path)
+    ground_truth_url = "https://raw.githubusercontent.com/ovlasenko-ellation/LLM_project3/refs/heads/main/Data/ground_truth.csv"
+    df_ground_truth = load_ground_truth_data(ground_truth_url)
 
-    # Evaluate the model
-    mrr_score, hit_rate_score = evaluate_model(df_ground_truth)
+    # Evaluate LLM and print results
+    v_llm, v_orig, mrr_score, hit_rate_score, cosine_similarities = evaluate_llm_against_ground_truth(df_ground_truth)
 
-    print(f"Mean Reciprocal Rank (MRR): {mrr_score}")
-    print(f"Hit Rate: {hit_rate_score}")
+    # Display cosine similarities for verification
+    print("Cosine Similarities between LLM answers and ground truth:", cosine_similarities)

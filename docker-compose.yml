@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      POSTGRES_DB: my_database
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: elasticsearch_container
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m  # Set JVM heap size
+      - xpack.security.enabled=false    # Disable security for testing
+    ports:
+      - "9200:9200"  # Expose Elasticsearch on port 9200
+      - "9300:9300"  # Transport port for cluster communication
+    volumes:
+      - es_data:/usr/share/elasticsearch/data  # Persistent storage for Elasticsearch data
+
+  streamlit:
+    image: aminehy/docker-streamlit-app:latest
+    container_name: streamlit_container
+    volumes:
+      - ./app:/app  # Mounts the local 'app' directory to the container
+    working_dir: /app
+    ports:
+      - "8501:8501"  # Exposes Streamlit on port 8501
+    command: streamlit run app.py  # Runs the Streamlit app
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Viewer
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY:-your_secret_key_here}
+      - GF_DATABASE_URL=postgres://db_user:db_password@postgres:5432/my_database
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  es_data:
+  grafana_data:

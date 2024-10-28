@@ -23,6 +23,37 @@ def get_db_connection():
     )
     return conn
 
+def create_tables():
+    """
+    Generates a table for conversations and feedbacks.
+    """
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        create_conversations_query = """
+        CREATE TABLE IF NOT EXISTS conversations(
+        conversation_id TEXT,
+        question TEXT,
+        answer TEXT
+        );
+        """
+        create_feedback_query = """
+        CREATE TABLE IF NOT EXISTS feedback(
+        conversation_id TEXT,
+        feedback TEXT
+        );
+        """
+        cursor.execute(create_conversations_query)
+        cursor.execute(create_feedback_query)
+        conn.commit()
+    except Exception as e:
+        print(f"Error saving conversation: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
 def generate_conversation_id():
     """
     Generates a unique UUID for each conversation.

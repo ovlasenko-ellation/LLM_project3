@@ -214,5 +214,5 @@ if __name__ == "__main__":
     df_ground_truth = generate_ground_truth(df)
 
     # Save ground truth data
-    output_path = '../Data/ground_truth.csv'
+    output_path = './Data/ground_truth.csv'
     save_ground_truth(df_ground_truth, output_path)

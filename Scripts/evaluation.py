@@ -84,7 +84,7 @@ def evaluate_model(df_ground_truth):
 
 if __name__ == "__main__":
     # Load ground truth data
-    ground_truth_path = '../Data/ground_truth.csv'
+    ground_truth_path = './Data/ground_truth.csv'
     df_ground_truth = load_ground_truth(ground_truth_path)
 
     # Evaluate the model

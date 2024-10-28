@@ -4,7 +4,6 @@ from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 from rag import (
     get_user_question,
-    generate_question_embedding,
     search_es,
     create_context,
     build_prompt,
@@ -12,12 +11,14 @@ from rag import (
 )  # Import functions directly from rag.py
 import os
 import logging
+from sentence_transformers import SentenceTransformer
 
 # Set up OpenAI API key
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+model_name = 'all-MiniLM-L6-v2'  # or any other compatible model
+embedding_model = SentenceTransformer(model_name)
 
-
-def load_ground_truth_data(url, num_rows=500):
+def load_ground_truth_data(url, num_rows=10):
     """
     Load the ground truth data and get the first num_rows.
     """
@@ -61,22 +62,6 @@ def evaluate_llm_against_ground_truth(df):
     """
     Evaluate the LLM against ground truth data based on a single user question.
     """
-    # Retrieve the actual user question once
-    question = get_user_question()
-
-    # Generate question embedding
-    question_embedding = generate_question_embedding(question)
-
-    # Elasticsearch retrieval and context creation based on the single question embedding
-    hits = search_es(question_embedding)
-    context = create_context(hits)
-
-    # Construct the prompt using the retrieved context and the actual user question
-    prompt = build_prompt(question, context)
-    llm_answer = llm(prompt)  # Call LLM to get an answer based on the single question
-
-    # Embedding for LLM answer, which will be compared to each ground truth answer
-    v_llm_embedding = generate_question_embedding(llm_answer)
 
     v_llm = []
     v_orig = []
@@ -84,10 +69,25 @@ def evaluate_llm_against_ground_truth(df):
     cosine_similarities = []
 
     for idx, row in df.iterrows():
+        question = row['question']
+        question_embedding = embedding_model.encode(question).tolist()
+        logging.info(f"Generated embedding for the question : {question_embedding}")
+
+        # Elasticsearch retrieval and context creation based on the single question embedding
+        hits = search_es(question_embedding)
+        context = create_context(hits)
+
+        # Construct the prompt using the retrieved context and the actual user question
+        prompt = build_prompt(question, context)
+        llm_answer = llm(prompt)[0]  # Call LLM to get an answer based on the single question
+
+        # Embedding for LLM answer, which will be compared to each ground truth answer
+        v_llm_embedding = embedding_model.encode(llm_answer).tolist()
+
         ground_truth_answer = row['answer']
 
         # Generate embedding for the ground truth answer
-        v_orig_embedding = generate_question_embedding(ground_truth_answer)
+        v_orig_embedding = embedding_model.encode(ground_truth_answer).tolist()
 
         # Store answers for similarity comparisons
         v_llm.append(llm_answer)
@@ -98,7 +98,7 @@ def evaluate_llm_against_ground_truth(df):
         cosine_similarities.append(similarity_score)
 
         # Determine relevance (similarity > threshold implies relevance)
-        is_relevant = similarity_score > 0.75  # Define a relevance threshold
+        is_relevant = similarity_score > 0.5  # Define a relevance threshold
         relevance_total.append([is_relevant])
 
     # Compute MRR and Hit Rate

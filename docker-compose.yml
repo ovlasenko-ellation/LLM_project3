@@ -31,10 +31,19 @@ services:
     container_name: streamlit_container
     volumes:
       - ./app:/app  # Mounts the local 'app' directory to the container
-      - ./Scripts:/Scripts  # Mounts the local 'app' directory to the container
+      - ./Scripts:/Scripts  # Mounts the local 'Scripts' directory to the container
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=my_database
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - ES_HOST=elasticsearch
     working_dir: /app
+    depends_on:
+      - postgres
+      - elasticsearch
     ports:
       - "8501:8501"  # Exposes Streamlit on port 8501
       - "8502:8502"  # Exposes Streamlit on port 8502

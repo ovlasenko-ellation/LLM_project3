@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO)
 #    raise ValueError("OpenAI API key not set. Please set it in your environment variables.")
 
 # Elasticsearch client configuration
-es = Elasticsearch(['http://localhost:9200'])  # Adjust the host and port as needed
+ES_HOST = os.getenv('ES_HOST', 'localhost')
+es = Elasticsearch([f'http://{ES_HOST}:9200'])  # Adjust the host and port as needed
 
 # Load the SentenceTransformer model globally
 model_name = 'all-MiniLM-L6-v2'  # or any other compatible model

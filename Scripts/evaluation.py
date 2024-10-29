@@ -18,7 +18,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 model_name = 'all-MiniLM-L6-v2'  # or any other compatible model
 embedding_model = SentenceTransformer(model_name)
 
-def load_ground_truth_data(url, num_rows=10):
+def load_ground_truth_data(url, num_rows=1000):
     """
     Load the ground truth data and get the first num_rows.
     """

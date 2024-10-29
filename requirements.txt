@@ -1,0 +1,10 @@
+elasticsearch
+numpy
+openai
+pandas
+scikit-learn
+scipy
+torch
+sentence-transformers
+tqdm
+transformers

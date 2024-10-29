@@ -6,16 +6,17 @@ An intelligent chatbot that provides expert advice on skincare products, routine
 
 - [Problem Description](#problem-description)
 - [Solution Overview](#solution-overview)
+- [Dataset](#dataset)
+- [Technologies](#technologies-)
 - [Retrieval-Augmented Generation (RAG) Flow](#retrieval-augmented-generation-rag-flow)
+- [Ingestion Pipeline](#ingestion-pipeline)
 - [Retrieval Evaluation](#retrieval-evaluation)
 - [RAG Evaluation](#rag-evaluation)
-- [Ingestion Pipeline](#ingestion-pipeline)
 - [User Interface](#user-interface)
 - [Monitoring and Feedback](#monitoring-and-feedback)
 - [Containerization](#containerization)
 - [Reproducibility](#reproducibility)
 - [Getting Started](#getting-started)
-- [License](#license)
 
 ## Problem Description
 
@@ -43,42 +44,45 @@ This project utilizes a Retrieval-Augmented Generation (RAG) flow that integrate
 
 - **Knowledge Base**: An Elasticsearch database containing curated skincare information.
 - **LLM**: An advanced language model that generates responses based on the retrieved context.
+- **Ground Truth Dataset**: A dataset used for RAG evaluation
+- **LLM evaluation**: A script having RAG evaluation metrics - MRR, hit rate, cosine similarity
 
 ## Ingestion Pipeline
 
 An automated ingestion pipeline was developed using Python scripts to streamline the process of importing data into the Elasticsearch knowledge base:
 
-- **Data Parsing**: Extracts and preprocesses data from source files.
+- **Data Parsing**: Extracts and preprocesses data from source files, transforms source data and adds vector embeddings
 - **Indexing**: Automates the indexing of documents into Elasticsearch.
 
+Data ingestion is done by the [data_preprocessing.py](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Scripts/data_preprocessing.py)
 
 ## Retrieval Evaluation
 
-Multiple retrieval approaches were evaluated to optimize the chatbot's performance:
+The created RAG model is operating using the script [rag.py](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Scripts/rag.py) that contains:
+- getting user question 
+- providing embedding for the user question 
+- searching in Elasticsearch using vector
+- building context and promt
+- actual Skincare LLM
+- evaluation using cosine similarity 
+- calculation of openAI cost
+- returning answer with various parameters from openAI and created LLM 
 
-1. **BM25 Retrieval**: Baseline retrieval using the Okapi BM25 algorithm.
-2. **TF-IDF Retrieval**: Evaluated for comparison with BM25.
-3. **Dense Vector Retrieval**: Implemented using embeddings for semantic search.
-
-After thorough testing, Dense Vector Retrieval was selected for its superior ability to capture semantic relationships and provide the most relevant context to the LLM.
+Retrieval evaluation is done using cosine similarity method.
 
 ## RAG Evaluation
 
-Various RAG approaches were tested to enhance the quality of the chatbot's responses:
-
-1. **Prompt Engineering**: Experimented with different prompt structures to guide the LLM effectively.
-2. **Context Window Sizes**: Adjusted the amount of context provided to the LLM for optimal performance.
-3. **Response Refinement**: Implemented iterative generation and refinement techniques.
-
-The best-performing approach combined an optimized prompt with an ideal context window size, resulting in accurate and concise answers.
-
-
+For RAG retrieval evaluation Ground truth dataset was created using the script [generate_ground_truth.py](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Scripts/generate_ground_truth.py)
+Based on ground truth data the following metrics were calculated for evaluation:
+- MRR
+- Hit Rate
+- Cosine Similarity
 
 ## User Interface
 
 The chatbot features an interactive web interface built with Streamlit:
 
-- **User-Friendly Design**: Intuitive layout for easy interaction.
+- **User-Friendly Design**: Contains forms for user question, ask button, feedback buttons, recent conversaiton filter and feedback stats.
 - **Real-Time Responses**: Provides immediate answers to user queries.
 - **Feedback Mechanism**: Allows users to rate responses for continuous improvement.
 
@@ -87,13 +91,14 @@ The chatbot features an interactive web interface built with Streamlit:
 To ensure the chatbot's effectiveness and facilitate continuous improvement, monitoring and feedback mechanisms are in place:
 
 - **User Feedback Collection**: Users can indicate the relevance of responses.
-- **Monitoring Dashboard**: A comprehensive dashboard with over five charts displays metrics such as:
+- **Grafana Dashboard**: A comprehensive dashboard with 6 charts displays metrics such as:
 
-  - **User Engagement**: Number of queries over time.
-  - **Response Accuracy**: Percentage of relevant feedback.
-  - **Popular Topics**: Frequently asked questions or concerns.
-  - **System Performance**: Response times and uptime.
-  - **Error Tracking**: Logs and alerts for any issues.
+  - **Response Time**: Response time for each conversation within the selected time range
+  - **Relevance Distribution**: Number of conversations for each relevance type within the selected time range.
+  - **Token Usage**: Average token usage over time, grouped by Grafana's automatically calculated interval.
+  - **OpenAI Cost**: Total OpenAI cost over time
+  - **Recent Conversations**: 5 most recent conversations within the selected time range.
+  - **Feedback Statistics**: Total number of positive and negative feedback within the selected time range
 
 ## Containerization
 
@@ -129,7 +134,24 @@ Follow these instructions to set up and run the AI-Powered Skincare Chatbot on y
    git clone https://github.com/ovlasenko-ellation/LLM_project3.git
    cd LLM_project3
     ```
-2. **Access the Dataset**
-3. **Build and Run the Containers**
-4. **Initialize the Knowledge Base**
+2. **Build and Run the Containers**
+Run the command to build the containers for the whole Architecture
+   ```bash
+   docker-compose up --build
+   ```
+3. **Start Ingestion pipeline and Initialize the Knowledgebase**
+Dataset needs to be loaded to ElasticSearch, for this run the script
+   ```bash
+   python Scripts/data_processing.py
+    ```
+4. **Initialize the Data Base**
+In order to get the tables created in Postgres run the command 
+   ```bash
+   python app/db_prep.py
+   ```
 5. **Access the Application**
+Open your web browser and navigate to http://localhost:8501 to interact with the chatbot
+
+6. **Monitor in Grafana**
+Access the monitoring dashboard at http://localhost:3000.
+Import the [dashboard.json]()

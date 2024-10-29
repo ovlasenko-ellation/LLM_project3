@@ -157,4 +157,4 @@ Access the monitoring dashboard at http://localhost:3000.
 Import the [dashboard.json](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Grafana/dashboard.json)
 
 ![dashboard1](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Grafana/dashboard1.png)
-![dashboard1](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Grafana/dashboard2.png)
+![dashboard2](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Grafana/dashboard2.png)

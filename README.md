@@ -154,4 +154,6 @@ Open your web browser and navigate to http://localhost:8501 to interact with the
 
 6. **Monitor in Grafana**
 Access the monitoring dashboard at http://localhost:3000.
-Import the [dashboard.json]()
+Import the [dashboard.json](https://github.com/ovlasenko-ellation/LLM_project3/blob/main/Grafana/dashboard.json)
+
+![dashboard1](path/to/image.png)

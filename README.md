@@ -139,6 +139,15 @@ Run the command to build the containers for the whole Architecture
    ```bash
    docker-compose up --build
    ```
+Make sure all the containers are up and running:
+- project container
+- srtreamlit container
+- elasticsearch
+- posrtgres
+
+   ```bash
+   docker ps
+   ```
 3. **Start Ingestion pipeline and Initialize the Knowledgebase**
 Dataset needs to be loaded to ElasticSearch, for this run the script
    ```bash

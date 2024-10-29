@@ -121,12 +121,13 @@ def save_feedback(conversation_id, feedback):
     """
     conn = get_db_connection()
     cursor = conn.cursor()
+    timestamp = datetime.now()
     try:
         insert_query = """
-        INSERT INTO feedback (conversation_id, feedback)
-        VALUES (%s, %s)
+        INSERT INTO feedback (conversation_id, feedback, timestamp)
+        VALUES (%s, %s, %s)
         """
-        cursor.execute(insert_query, (conversation_id, feedback))
+        cursor.execute(insert_query, (conversation_id, feedback, timestamp))
         conn.commit()
         logging.info(f"Feedback for conversation {conversation_id} saved successfully.")
     except Exception as e:
